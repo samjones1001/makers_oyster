@@ -7,6 +7,10 @@ describe Oystercard do
     expect(card.balance).to eq(0)
   end
 
+  it('is not in a journey at initialization') do
+    expect(card.in_journey?).to eq(false)
+  end
+
   describe("#top_up") do
     it("increases the balance by the passed amount") do
       expect{ card.top_up(10) }.to change{ card.balance }.by(10)
@@ -22,6 +26,21 @@ describe Oystercard do
     it('decreases the balance by the passed amount') do
       card.top_up(10)
       expect{ card.deduct(5) }.to change{ card.balance }.by(-5)
+    end
+  end
+
+  describe('#touch_in') do
+    it('sets the card to be in journey') do
+      card.touch_in
+      expect(card).to be_in_journey
+    end
+  end
+
+  describe('#touch_out') do
+    it('sets the card to not be in a journey') do
+      card.touch_in
+      card.touch_out
+      expect(card).to_not be_in_journey
     end
   end
 end
