@@ -29,18 +29,32 @@ describe Oystercard do
     end
   end
 
-  describe('#touch_in') do
-    it('sets the card to be in journey') do
-      card.touch_in
-      expect(card).to be_in_journey
+  context('before topping up') do
+    describe("#touch_in") do
+      it('raises an error if below minimum fare') do
+        expect{ card.touch_in }.to raise_error("insufficient funds - minimum fare is £#{Oystercard::MINIMUM_FARE}")
+      end
     end
   end
 
-  describe('#touch_out') do
-    it('sets the card to not be in a journey') do
-      card.touch_in
-      card.touch_out
-      expect(card).to_not be_in_journey
+  context('after topping up') do
+    before(:each) do
+      card.top_up(10)
+    end
+
+    describe('#touch_in') do
+      it('sets the card to be in journey') do
+        card.touch_in
+        expect(card).to be_in_journey
+      end
+    end
+
+    describe('#touch_out') do
+      it('sets the card to not be in a journey') do
+        card.touch_in
+        card.touch_out
+        expect(card).to_not be_in_journey
+      end
     end
   end
 end

@@ -1,6 +1,7 @@
 class Oystercard
   attr_reader :balance, :in_journey
   MAX_BALANCE = 90
+  MINIMUM_FARE = 1
 
   def initialize
     @balance = 0
@@ -21,6 +22,7 @@ class Oystercard
   end
 
   def touch_in
+    raise "insufficient funds - minimum fare is £#{MINIMUM_FARE}" if below_min?
     @in_journey = true
   end
 
@@ -31,5 +33,9 @@ class Oystercard
   private
   def exceeds_max?(top_up_amount)
     @balance + top_up_amount > MAX_BALANCE
+  end
+
+  def below_min?
+    balance < MINIMUM_FARE
   end
 end
