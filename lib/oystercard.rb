@@ -11,6 +11,10 @@ class Oystercard
     @balance += amount
   end
 
+  def deduct(amount)
+    @balance -= amount
+  end
+
   private
   def exceeds_max?(top_up_amount)
     @balance + top_up_amount > MAX_BALANCE
