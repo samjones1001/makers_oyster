@@ -1,22 +1,18 @@
 require 'oystercard'
 
 describe Oystercard do
-  let(:card)              { described_class.new(current_journey) }
-  let(:entry_station)     { double :station }
-  let(:exit_station)      { double :station }
-  let(:current_journey)   { double :current_journey, new: journey }
-  let(:journey)           { double :journey, entry_station: nil, exit_station: nil }
+  let(:card)                    { described_class.new(journey_log_class) }
+  let(:entry_station)           { double :station }
+  let(:exit_station)            { double :station }
+  let(:journey_log_class)       { double :journey_log, new: journey_log }
+  let(:journey_log)             { double :journey_log }
 
   it('has a balance of 0 at initialization') do
     expect(card.balance).to eq(0)
   end
 
-  it('initializes with an empty current journey') do
-    expect(card.current_journey).to eq(journey)
-  end
-
-  it('initializes with an empty journey history') do
-    expect(card.journey_history).to eq([])
+  it('initializes with a journey history') do
+    expect(card.journey_log).to eq(journey_log)
   end
 
   describe("#top_up") do
@@ -33,7 +29,7 @@ describe Oystercard do
   context('before topping up') do
     describe("#touch_in") do
       it('raises an error if below minimum fare') do
-        allow(journey).to receive(:complete?).and_return(true)
+        allow(journey_log).to receive(:journey_complete?).and_return(true)
         expect{ card.touch_in(entry_station) }.to raise_error("insufficient funds - minimum fare is £#{Journey::MINIMUM_FARE}")
       end
     end
@@ -46,57 +42,41 @@ describe Oystercard do
 
     describe('#touch_in') do
       it('starts the current journey') do
-        allow(journey).to receive(:complete?).and_return(true)
-        expect(journey).to receive(:start).with(entry_station)
+        allow(journey_log).to receive(:journey_complete?).and_return(true)
+        expect(journey_log).to receive(:start).with(entry_station)
         card.touch_in(entry_station)
       end
 
       it('charges a penalty fare if previous journey was incomplete') do
-        allow(journey).to receive(:complete?).and_return(false)
-        allow(journey).to receive(:start).with(entry_station)
-        allow(journey).to receive(:calculate_fare).and_return(Journey::PENALTY_FARE)
+        allow(journey_log).to receive(:journey_complete?).and_return(false)
+        allow(journey_log).to receive(:start).with(entry_station)
+        allow(journey_log).to receive(:process_fare).and_return(Journey::PENALTY_FARE)
+        allow(journey_log).to receive(:reset_journey)
         expect{ card.touch_in(entry_station) }.to change{ card.balance }.by(-Journey::PENALTY_FARE)
-      end
-
-      it('add a journey to the journey history if previous journey was incomplete') do
-        allow(journey).to receive(:complete?).and_return(false)
-        allow(journey).to receive(:start).with(entry_station)
-        allow(journey).to receive(:calculate_fare).and_return(Journey::PENALTY_FARE)
-        card.touch_in(entry_station)
-        expect(card.journey_history.length).to eq(1)
       end
     end
 
     context('after touching in') do
       before(:each) do
-        allow(journey).to receive(:complete?).and_return(true)
-        allow(journey).to receive(:start).with(entry_station)
+        allow(journey_log).to receive(:journey_complete?).and_return(true)
+        allow(journey_log).to receive(:start).with(entry_station)
         card.touch_in(entry_station)
       end
 
       describe('#touch_out') do
         before(:each) do
-          allow(journey).to receive(:calculate_fare).and_return(Journey::MINIMUM_FARE)
-          allow(journey).to receive(:end)
+          allow(journey_log).to receive(:process_fare).and_return(Journey::MINIMUM_FARE)
+          allow(journey_log).to receive(:end)
+          allow(journey_log).to receive(:reset_journey)
         end
 
         it('ends the current journey') do
-          expect(journey).to receive(:end).with(exit_station)
+          expect(journey_log).to receive(:end).with(exit_station)
           card.touch_out(exit_station)
         end
 
         it('charges a fare') do
           expect{ card.touch_out(exit_station) }.to change{ card.balance }.by(-Journey::MINIMUM_FARE)
-        end
-
-        it('resets the current_journey') do
-          card.touch_out(exit_station)
-          expect(card.current_journey).to eq(journey)
-        end
-
-        it('stores the journey') do
-          card.touch_out(exit_station)
-          expect(card.journey_history.length).to eq(1)
         end
       end
     end
