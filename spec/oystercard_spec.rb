@@ -1,23 +1,18 @@
 require 'oystercard'
 
 describe Oystercard do
-  let(:card)              { described_class.new }
+  let(:card)              { described_class.new(current_journey) }
   let(:entry_station)     { double :station }
   let(:exit_station)      { double :station }
-  let(:empty_journey)     { {entry: nil, exit: nil} }
-  let(:started_journey)   { {entry: entry_station, exit: nil} }
-  let(:completed_journey) { {entry: entry_station, exit: exit_station} }
+  let(:current_journey)   { double :current_journey, new: journey }
+  let(:journey)           { double :journey, entry_station: nil, exit_station: nil }
 
   it('has a balance of 0 at initialization') do
     expect(card.balance).to eq(0)
   end
 
-  it('is not in a journey at initialization') do
-    expect(card.in_journey?).to eq(false)
-  end
-
   it('initializes with an empty current journey') do
-    expect(card.current_journey).to eq(empty_journey)
+    expect(card.current_journey).to eq(journey)
   end
 
   it('initializes with an empty journey history') do
@@ -38,7 +33,8 @@ describe Oystercard do
   context('before topping up') do
     describe("#touch_in") do
       it('raises an error if below minimum fare') do
-        expect{ card.touch_in(entry_station) }.to raise_error("insufficient funds - minimum fare is £#{Oystercard::MINIMUM_FARE}")
+        allow(journey).to receive(:complete?).and_return(true)
+        expect{ card.touch_in(entry_station) }.to raise_error("insufficient funds - minimum fare is £#{Journey::MINIMUM_FARE}")
       end
     end
   end
@@ -49,40 +45,58 @@ describe Oystercard do
     end
 
     describe('#touch_in') do
-      it('sets the card to be in journey') do
+      it('starts the current journey') do
+        allow(journey).to receive(:complete?).and_return(true)
+        expect(journey).to receive(:start).with(entry_station)
         card.touch_in(entry_station)
-        expect(card).to be_in_journey
       end
 
-      it('retains the entry station') do
+      it('charges a penalty fare if previous journey was incomplete') do
+        allow(journey).to receive(:complete?).and_return(false)
+        allow(journey).to receive(:start).with(entry_station)
+        allow(journey).to receive(:calculate_fare).and_return(Journey::PENALTY_FARE)
+        expect{ card.touch_in(entry_station) }.to change{ card.balance }.by(-Journey::PENALTY_FARE)
+      end
+
+      it('add a journey to the journey history if previous journey was incomplete') do
+        allow(journey).to receive(:complete?).and_return(false)
+        allow(journey).to receive(:start).with(entry_station)
+        allow(journey).to receive(:calculate_fare).and_return(Journey::PENALTY_FARE)
         card.touch_in(entry_station)
-        expect(card.current_journey).to eq(started_journey)
+        expect(card.journey_history.length).to eq(1)
       end
     end
 
     context('after touching in') do
       before(:each) do
+        allow(journey).to receive(:complete?).and_return(true)
+        allow(journey).to receive(:start).with(entry_station)
         card.touch_in(entry_station)
       end
 
       describe('#touch_out') do
-        it('sets the card to not be in a journey') do
-          card.touch_out(exit_station)
-          expect(card).to_not be_in_journey
+        before(:each) do
+          allow(journey).to receive(:calculate_fare).and_return(Journey::MINIMUM_FARE)
+          allow(journey).to receive(:end)
         end
 
-        it('charges the minimum fare') do
-          expect{ card.touch_out(exit_station) }.to change{ card.balance }.by(-Oystercard::MINIMUM_FARE)
+        it('ends the current journey') do
+          expect(journey).to receive(:end).with(exit_station)
+          card.touch_out(exit_station)
+        end
+
+        it('charges a fare') do
+          expect{ card.touch_out(exit_station) }.to change{ card.balance }.by(-Journey::MINIMUM_FARE)
         end
 
         it('resets the current_journey') do
           card.touch_out(exit_station)
-          expect(card.current_journey).to eq(empty_journey)
+          expect(card.current_journey).to eq(journey)
         end
 
         it('stores the journey') do
           card.touch_out(exit_station)
-          expect(card.journey_history).to include(completed_journey)
+          expect(card.journey_history.length).to eq(1)
         end
       end
     end

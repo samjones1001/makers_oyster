@@ -1,11 +1,14 @@
-class Oystercard
-  attr_reader :balance, :current_journey, :journey_history
-  MAX_BALANCE = 90
-  MINIMUM_FARE = 1
+require_relative 'journey'
+require_relative 'station'
 
-  def initialize
+class Oystercard
+  attr_reader :balance, :current_journey, :journey_history, :journey_class
+  MAX_BALANCE = 90
+
+  def initialize(journey_class = Journey)
     @balance = 0
-    @current_journey = {entry: nil, exit: nil}
+    @journey_class = journey_class
+    @current_journey = journey_class.new
     @journey_history = []
   end
 
@@ -14,19 +17,16 @@ class Oystercard
     @balance += amount
   end
 
-  def in_journey?
-    !!current_journey[:entry]
-  end
-
   def touch_in(entry_station)
-    raise "insufficient funds - minimum fare is £#{MINIMUM_FARE}" if below_min?
-    @current_journey[:entry] = entry_station
+    process_penalty if !current_journey.complete?
+    raise "insufficient funds - minimum fare is £#{Journey::MINIMUM_FARE}" if below_min?
+    current_journey.start(entry_station)
   end
 
   def touch_out(exit_station)
-    @current_journey[:exit] = exit_station
-    add_journey
-    deduct(MINIMUM_FARE)
+    current_journey.end(exit_station)
+    deduct(current_journey.calculate_fare)
+    reset_journey
   end
 
   private
@@ -39,15 +39,21 @@ class Oystercard
   end
 
   def below_min?
-    balance < MINIMUM_FARE
+    balance < Journey::MINIMUM_FARE
   end
 
-  def add_journey
+  def reset_journey
     journey_history << current_journey
+    p journey_history
     erase_current_journey
   end
 
   def erase_current_journey
-    @current_journey = {entry: nil, exit: nil}
+    @current_journey = journey_class.new
+  end
+
+  def process_penalty
+    deduct(current_journey.calculate_fare)
+    reset_journey
   end
 end
