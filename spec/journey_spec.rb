@@ -1,9 +1,9 @@
 require 'journey'
 
 describe Journey do
-  let (:journey)      { described_class.new }
-  let(:entry_station) { double :station }
-  let(:exit_station)  { double :station }
+  let (:journey)          { described_class.new }
+  let(:entry_station)     { double :station, :zone => 1 }
+  let(:exit_station)      { double :station }
 
   it('initializes with no entry station') do
     expect(journey.entry_station).to eq(nil)
@@ -28,10 +28,20 @@ describe Journey do
   end
 
   describe('#calculate_fare') do
-    it('returns the minimum fare if the journey is completed') do
+    it('returns the minimum fare if a journey is completed with stations in the same zone') do
+      allow(exit_station).to receive(:zone).and_return(1)
       journey.start(entry_station)
       journey.end(exit_station)
       expect(journey.calculate_fare).to eq(Journey::MINIMUM_FARE)
+    end
+
+    it('calculates the correct fare if a journey is completed with stations in different zones') do
+      zone = 1 + rand(5)
+      fare_from_zone_one = zone
+      allow(exit_station).to receive(:zone).and_return(zone)
+      journey.start(entry_station)
+      journey.end(exit_station)
+      expect(journey.calculate_fare).to eq(fare_from_zone_one)
     end
 
     it('returns the penalty fare if the journey is not complete') do
